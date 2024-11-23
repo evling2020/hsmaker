@@ -1,0 +1,166 @@
+services:
+  traefik:
+    image: traefik:v3
+    restart: always
+    container_name: headscale-traefik
+    command:
+      - "--global.checkNewVersion=true"
+        #- "--global.sendAnonymousUsage=true"
+        #- "--log.level=info"
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--log=true"
+        #- "--log.filePath=/var/log/traefik/traefik.log"
+      - "--log.level=DEBUG" # (Default: error) DEBUG, INFO, WARN, ERROR, FATAL, PANIC
+      - "--log.format=json"
+      - "--accessLog=true"
+      - "--accessLog.filePath=/var/log/traefik/access.log"
+      - "--accessLog.bufferingSize=100" # Configuring a buffer of 100 lines
+      - "--accessLog.format=json"
+      - "--accesslog.fields.defaultmode=keep"
+      - "--accesslog.fields.names.ClientUsername=drop"
+      - "--accesslog.fields.names.ClientAddr=drop"
+      - "--accesslog.fields.names.RequestAddr=drop"
+      - "--accesslog.fields.names.StartUTC=drop"
+      - "--accesslog.fields.headers.names.time=drop"
+      - "--accesslog.fields.headers.defaultmode=drop"
+      - "--accesslog.fields.headers.names.User-Agent=keep"
+      - "--accesslog.fields.headers.names.Authorization=drop"
+      - "--accesslog.fields.headers.names.Content-Type=keep"
+      - "--serversTransport.insecureSkipVerify=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:$TRAEFIK_WEB_PORT"
+      - "--entrypoints.websecure.address=:$TRAEFIK_WEBSECURE_PORT"
+      - "--entrypoints.traefik.address=127.0.0.1:8083"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.websecure.forwardedHeaders.trustedIPs=$CLOUDFLARE_IPS,$LOCAL_IPS"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.http.tls.options=tls-opts@file"
+        # Add dns-cloudflare as default certresolver for all services. Also enables TLS and no need to specify on individual services
+      - "--entrypoints.websecure.http.tls.certresolver=cfresolver"
+      - "--entrypoints.websecure.http.tls.domains[0].main=$DOMAINNAME"
+      - "--entrypoints.websecure.http.tls.domains[0].sans=*.$DOMAINNAME,*.demo.$DOMAINNAME"
+      - "--providers.file.directory=/rules" # Load dynamic configuration from one or more .toml or .yml files in a directory
+      - "--providers.file.watch=true" # Only works on top level files in the rules folder
+      - "--certificatesresolvers.cfresolver.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesResolvers.dns-cloudflare.acme.caServer=https://acme-staging-v02.api.letsencrypt.org/directory" # LetsEncrypt Staging Server - uncomment when testing
+      - "--certificatesresolvers.cfresolver.acme.dnschallenge.delaybeforecheck=90"
+      - "--certificatesresolvers.cfresolver.acme.storage=/certs/acme.json"
+      - "--certificatesresolvers.cfresolver.acme.email=$CERT_EMAIL"
+      - "--certificatesresolvers.cfresolver.acme.dnschallenge.resolvers=8.8.8.8:53" # pihole address
+      - "--experimental.plugins.traefik-forwarded-real-ip.modulename=github.com/pvalletbo/traefik-forwarded-real-ip"
+      - "--experimental.plugins.traefik-forwarded-real-ip.version=v1.0.3"
+    environment:
+      - TZ
+      - CF_DNS_API_TOKEN_FILE=/run/secrets/cf_api_token
+      - DOMAINNAME # Passing the domain name to traefik container to be able to use the variable in rules.
+      - CERT_EMAIL
+      - DERP_DOMAIN
+    volumes:
+      - "./traefik/rules:/rules"
+      - "./certs/acme.json:/certs/acme.json"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./logs/traefik:/var/log/traefik"
+    network_mode: host
+    secrets:
+      - cf_api_token
+
+  server: # 服务端
+    image: headscale/headscale
+    container_name: headscale-server
+    environment:
+      - TZ
+    volumes:
+      - ./headscale/config:/etc/headscale # 提前放好config.yaml和derp.yaml
+      - ./headscale/data:/var/lib/headscale
+      - ./headscale/run:/var/run/headscale
+      - /usr/share/zoneinfo/Asia/Chongqing:/etc/localtime:ro # 使用NAS的时间
+    ports:
+      - "127.0.0.1:9080:8080" # listen port
+    command: serve # v0.22及以前的版本需要使用headscale serve
+    restart: always
+    depends_on:
+      - derp
+
+  webui: # UI端
+    image: ghcr.io/gurucomputing/headscale-ui
+    container_name: headscale-ui
+    environment:
+      - TZ
+      - HTTP_PORT=7070
+    ports:
+      - "127.0.0.1:7443:8443"
+    volumes:
+      - /usr/share/zoneinfo/Asia/Chongqing:/etc/localtime:ro
+    restart: always
+
+  derp: # 中继端
+    image: fredliang/derper:latest
+    container_name: headscale-derp
+    network_mode: host
+    environment:
+      - TZ
+      - DERP_HTTP_PORT
+      - DERP_ADDR
+      - DERP_STUN_PORT
+      - DERP_CERT_MODE
+      - DERP_VERIFY_CLIENTS
+      - DERP_DOMAIN
+    volumes:
+      - ./certs:/app/certs
+      - ./tailscale:/var/run/tailscale
+      - /usr/share/zoneinfo/Asia/Chongqing:/etc/localtime:ro
+    restart: always
+    depends_on:
+      - client
+
+  client: # 客 户 端
+    image: tailscale/tailscale
+    container_name: headscale-client
+      #networks:
+      #- private
+    network_mode: "host" # 用做连接各子网的客户端时，这样最简单
+    privileged: true
+    environment:
+      - TZ
+      - TS_EXTRA_ARGS
+    volumes:
+      - ./tailscale:/var/run/tailscale # 要在NAS上和derp共享同一个目录
+      - /usr/share/zoneinfo/Asia/Chongqing:/etc/localtime:ro
+      - /var/lib:/var/lib
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - net_admin
+      - sys_module
+    command: tailscaled
+    restart: always
+      
+  worker:
+    build: ./worker
+    image: evling/hsworker:1.0
+    container_name: headscale-worker
+    network_mode: host
+    privileged: true
+    cap_add:
+      - net_admin
+      - sys_module
+    environment:
+      - TZ
+      - DERP_DOMAIN
+      - CF_MASTER_DOMAIN
+      - CF_SLAVE_DOMAINS
+      - DERP_STUN_PORT
+      - TRAEFIK_WEBSECURE_PORT
+    volumes:
+      - ./certs:/app/certs
+      - ./headscale/config:/etc/headscale
+    restart: always
+    secrets:
+      - cf_api_token
+
+secrets:
+  cf_api_token:
+    file: ./secrets/cf_api_token

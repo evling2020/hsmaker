@@ -1,0 +1,8 @@
+http:
+  middlewares:
+    middlewares-common-headers:
+      headers:
+        customRequestHeaders:
+          GATEWAY-ORIGIN: 26PbNz7E1g7X49N8
+            #X-Real-Ip: "{remote_addr}"  
+            #

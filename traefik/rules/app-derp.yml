@@ -1,0 +1,12 @@
+http:
+  routers:
+    derp-rtr:
+      rule: "Host(`{{env "DERP_DOMAIN"}}`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        #- ipwhitelist-derp-internal
+        - chain-common
+          #- middlewares-authentik
+      priority: 10
+      service: derp-svc

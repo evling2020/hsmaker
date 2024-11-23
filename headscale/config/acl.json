@@ -1,0 +1,19 @@
+{
+    "acls": [
+    {
+      "action": "accept",
+      "src": ["users"],
+      "dst": [
+        "*:*",
+        "guest:*"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": ["guest"],
+      "dst": [
+        "guest:*"
+      ]
+    }
+    ]
+}

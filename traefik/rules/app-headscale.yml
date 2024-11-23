@@ -1,0 +1,21 @@
+http:
+  routers:
+    hs-rtr:
+      rule: "Host(`hs.{{env "DOMAINNAME"}}`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - ipwhitelist-cf
+        - chain-common
+          #- middlewares-authentik
+      priority: 10
+      service: hs-svc
+    hs-ui-rtr:
+      rule: "Host(`hs.{{env "DOMAINNAME"}}`) && PathPrefix(`/web`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        #- ipwhitelist-hs-internal
+        - chain-common
+        #priority: 15
+      service: hs-ui-svc

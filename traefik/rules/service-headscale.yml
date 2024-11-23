@@ -1,0 +1,10 @@
+http:
+  services:
+    hs-svc:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:9080"
+    hs-ui-svc:
+      loadBalancer:
+        servers:
+          - url: "https://127.0.0.1:7443"
