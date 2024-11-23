@@ -102,6 +102,7 @@ class NatterPost():
             cf.set_origin_rule(self.cf_master_host, self.cf_slave_hosts, public_port)
 
         Logger.info("Updating ipv4 derp info")
+        yaml_data['regions'][900]['nodes'][0]['ipv4'] = public_ip
         yaml_data['regions'][900]['nodes'][0]["derpport" if protocol=="tcp" else "stunport"] = int(public_port)
         yaml_data['regions'][900]['nodes'][0]['hostname'] = self.derp_domain
         with open(self.derp_file, "w") as file:
