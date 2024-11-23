@@ -111,8 +111,8 @@ class NatterPost():
 
     def update_ipv6_address(self):
         ipv6_address = self.get_public_ipv6_address()
-        if ipv6_address is None:
-            return
+        # if ipv6_address is None:
+        #     return
         if not os.path.exists(self.derp_file):
             yaml_data = {
                 'regions':{
@@ -176,6 +176,8 @@ class NatterPost():
                 cf.set_a_record(self.cf_master_host, public_ip, proxied=True)
                 Logger.info(f"Setting origin rules : [ {self.cf_master_host}, {', '.join(self.cf_slave_hosts)} ]")
                 cf.set_origin_rule(self.cf_master_host, self.cf_slave_hosts, public_port)
+            else:
+                return
         with open(self.derp_file, "w") as file:
             yaml.dump(yaml_data, file, default_flow_style=False, allow_unicode=True)
             file.close()
