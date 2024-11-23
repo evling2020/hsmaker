@@ -11,7 +11,7 @@ services:
       - "--api.dashboard=true"
       - "--log=true"
         #- "--log.filePath=/var/log/traefik/traefik.log"
-      - "--log.level=DEBUG" # (Default: error) DEBUG, INFO, WARN, ERROR, FATAL, PANIC
+      - "--log.level=INFO" # (Default: error) DEBUG, INFO, WARN, ERROR, FATAL, PANIC
       - "--log.format=json"
       - "--accessLog=true"
       - "--accessLog.filePath=/var/log/traefik/access.log"
