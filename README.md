@@ -14,3 +14,10 @@
 - 自动同步traefik生成的证书给derp使用
 - 自动监测ipv6地址变化，并同步更新
 - ipv6防火墙仅开放derp端口和stun端口
+
+## 快速开始
+```bash
+git clone https://github.com/evling2020/hsmaker.git
+chmod 0600 certs/acme.json 
+docker compose up -d
+```

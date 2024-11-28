@@ -3,7 +3,7 @@ set -m  # 启用作业控制
 set -e  # 如果任何命令失败，脚本退出
 
 sed -i "s|server_url:.*|server_url:\ https://${CF_MASTER_DOMAIN}|" /etc/headscale/config.yaml
-
+chmod 0600 /app/certs/acme.json 
 sleep 5
 
 # 启动第一个阻塞程序

@@ -59,6 +59,8 @@ services:
       - DOMAINNAME # Passing the domain name to traefik container to be able to use the variable in rules.
       - CERT_EMAIL
       - DERP_DOMAIN
+      - CF_MASTER_DOMAIN
+      - DERP_ADDR
     volumes:
       - "./traefik/rules:/rules"
       - "./certs/acme.json:/certs/acme.json"
