@@ -2,6 +2,10 @@
 set -m  # 启用作业控制
 set -e  # 如果任何命令失败，脚本退出
 
+sed -i "s|server_url:.*|server_url:\ https://${CF_MASTER_DOMAIN}|" /etc/headscale/config.yaml
+
+sleep 5
+
 # 启动第一个阻塞程序
 python3 /opt/natter.py -m nftables -e /opt/natter-post.py -p $TRAEFIK_WEBSECURE_PORT &
 pid1=$!

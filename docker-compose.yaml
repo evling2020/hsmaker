@@ -84,6 +84,7 @@ services:
     restart: always
     depends_on:
       - derp
+      - worker
 
   webui: # UI端
     image: ghcr.io/gurucomputing/headscale-ui
@@ -140,7 +141,7 @@ services:
       
   worker:
     build: ./worker
-    image: evling/hsworker:1.0
+    image: evling/hsworker:latest
     container_name: headscale-worker
     network_mode: host
     privileged: true
@@ -160,6 +161,8 @@ services:
     restart: always
     secrets:
       - cf_api_token
+    depends_on:
+      - traefik
 
 secrets:
   cf_api_token:

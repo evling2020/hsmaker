@@ -70,7 +70,7 @@ class NatterPost():
                         return ipv6_address
         return None
 
-    def update_ipv4_address(self):
+    def update_ipv4_address(self, update_derp_only=False):
         protocol, private_ip, private_port, public_ip, public_port = sys.argv[1:6]
         if not os.path.exists(self.derp_file):
             yaml_data = {
@@ -93,7 +93,7 @@ class NatterPost():
                 yaml_data = yaml.safe_load(file)  # 加载为 Python 字典
                 file.close()
 
-        if protocol == "tcp":
+        if not update_derp_only and protocol == "tcp":
             Logger.info("Updating Cloudflare info")
             cf = CloudFlareOrigin(self.cf_auth_key)
             Logger.info(f"Setting [ {self.cf_master_host} ] DNS to [ {public_ip} ] proxied by CloudFlare...")
@@ -109,7 +109,7 @@ class NatterPost():
             yaml.dump(yaml_data, file, default_flow_style=False, allow_unicode=True)
             file.close()
 
-    def update_ipv6_address(self):
+    def update_ipv6_address(self, force_update=False):
         ipv6_address = self.get_public_ipv6_address()
         # if ipv6_address is None:
         #     return
@@ -135,10 +135,10 @@ class NatterPost():
                 file.close()
         # if ipv6_address is None and len(yaml_data['regions'][900]['nodes']) > 1 and yaml_data['regions'][900]['nodes'][1].get('ipv6') is None:
         #     return
-        if len(yaml_data['regions'][900]['nodes']) > 1 and yaml_data['regions'][900]['nodes'][1].get(
+        if not force_update and len(yaml_data['regions'][900]['nodes']) > 1 and yaml_data['regions'][900]['nodes'][1].get(
                 'ipv6') == ipv6_address:
             # Logger.info("IPv6地址没有变化，不做更新")
-            return
+            return False
         cf = CloudFlareOrigin(self.cf_auth_key)
         if ipv6_address:
             Logger.info(f"Updating Derp IPv6 address: {ipv6_address}")
@@ -155,6 +155,9 @@ class NatterPost():
                 yaml_data['regions'][900]['nodes'].append(to_add_item)
             else:
                 yaml_data['regions'][900]['nodes'][1].update(to_add_item)
+            with open(self.derp_file, "w") as file:
+                yaml.dump(yaml_data, file, default_flow_style=False, allow_unicode=True)
+                file.close()
             Logger.info("Updating Cloudflare info")
             Logger.info(f"Setting [ {self.cf_master_host} ] DNS to [ {ipv6_address} ] proxied by CloudFlare...")
             cf.set_a_record(self.cf_master_host, ipv6_address, proxied=True, type="AAAA")
@@ -169,6 +172,9 @@ class NatterPost():
             if len(yaml_data['regions'][900]['nodes']) > 1 and yaml_data['regions'][900]['nodes'][1].get('ipv6'):
                 Logger.info(f"Removing Derp IPv6 address")
                 yaml_data['regions'][900]['nodes'].pop(1)
+                with open(self.derp_file, "w") as file:
+                    yaml.dump(yaml_data, file, default_flow_style=False, allow_unicode=True)
+                    file.close()
                 ## 回退降级至ipv4端口暴露
                 public_ip = yaml_data['regions'][900]['nodes'][0]['ipv4']
                 public_port = yaml_data['regions'][900]['nodes'][0]['derpport']
@@ -177,11 +183,7 @@ class NatterPost():
                 Logger.info(f"Setting origin rules : [ {self.cf_master_host}, {', '.join(self.cf_slave_hosts)} ]")
                 cf.set_origin_rule(self.cf_master_host, self.cf_slave_hosts, public_port)
             else:
-                return
-        with open(self.derp_file, "w") as file:
-            yaml.dump(yaml_data, file, default_flow_style=False, allow_unicode=True)
-            file.close()
-
+                return False
         Logger.info("ipv6 nftables setting ...")
         try:
             result = subprocess.check_output(
@@ -204,6 +206,8 @@ class NatterPost():
         subprocess.check_output(["nft"] + [f"add rule ip6 filter input_natter udp dport {self.derp_stun_port} accept"])
         subprocess.check_output(["nft"] + [
             "add rule ip6 filter input_natter icmpv6 type { echo-request, echo-reply, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert } accept"])
+
+        return True
 
     # 读取 acme.json 文件
     def read_acme_json(self, json_path):
@@ -386,6 +390,7 @@ class CloudFlareOrigin:
                     ret = json.load(res)
                 break
             except urllib.error.HTTPError as e:
+                time.sleep(5)
                 ret = json.load(e)
         if "errors" not in ret:
             raise RuntimeError(ret)
@@ -530,7 +535,10 @@ class CloudFlareOrigin:
 def main():
     natter_post = NatterPost()
     if len(sys.argv) == 6:
-        natter_post.update_ipv4_address()
+        update_derp_only = True
+        if sys.argv[1] == "tcp":
+            update_derp_only = natter_post.update_ipv6_address(force_update=True)
+        natter_post.update_ipv4_address(update_derp_only)
     else:
         # 定期同步一次证书
         schedule.every(1).minutes.do(natter_post.sync_certificates, acme_json_path=natter_post.acme_json_file, derp_dir=natter_post.derp_dir, domain=natter_post.derp_domain)

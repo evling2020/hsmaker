@@ -3,4 +3,4 @@ http:
     derp-svc:
       loadBalancer:
         servers:
-          - url: "http://127.0.0.1:56060"
+          - url: "http://127.0.0.1`{{env "DERP_ADDR"}}`"

@@ -1,7 +1,7 @@
 http:
   routers:
     hs-rtr:
-      rule: "Host(`hs.{{env "DOMAINNAME"}}`)"
+      rule: "Host(`{{env "CF_MASTER_DOMAIN"}}`)"
       entryPoints:
         - websecure
       middlewares:
@@ -11,7 +11,7 @@ http:
       priority: 10
       service: hs-svc
     hs-ui-rtr:
-      rule: "Host(`hs.{{env "DOMAINNAME"}}`) && PathPrefix(`/web`)"
+      rule: "Host(`{{env "CF_MASTER_DOMAIN"}}`) && PathPrefix(`/web`)"
       entryPoints:
         - websecure
       middlewares:
