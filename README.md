@@ -18,6 +18,7 @@
 ## 快速开始
 ```bash
 git clone https://github.com/evling2020/hsmaker.git
+# 替换如上获取到的cloudflare token到文件secrets/cf_api_token里边
 chmod 0600 certs/acme.json 
 docker compose up -d
 ```
